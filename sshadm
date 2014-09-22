@@ -1,7 +1,6 @@
 #!/bin/ksh
 #sshadm V1.0
 #John R. Ray 4 March 2011 
-#General Dynamics Information Technology
 #Script to ssh to machines to find out information about them
 
 #V1.1 Added Usage Statement and Option Parsing JR|Ray 6 Oct 2011
@@ -41,7 +40,7 @@ echo ${1} >> /tmp/${logFile}
 ping ${1} > /dev/null
 if [ $? = 0 ]; then
 	echo "Host "${1}" working..."
-	ssh -q ${1} /opt/sfw/bin/sudo ${sshCommand} >> /tmp/${logFile}
+	ssh -qf ${1} ${sudocmd} ${sshCommand} >> /tmp/${logFile}
 else
 	echo "Machine not responding" >> /tmp/${logFile}
 fi
@@ -52,14 +51,15 @@ hostList=
 hostName=
 logFile=sshadm.$$
 vid=1.1
+sudocmd=`which sudo`
 
 ##Main##
 userId=`id | cut -c5`
-if [ ${userId} = 0 ]; then
-        echo "This script cannot be run as root"
-        echo "Please contact your system administrator."
-exit 0
-fi
+#if [ ${userId} = 0 ]; then
+#        echo "This script cannot be run as root"
+#        echo "Please contact your system administrator."
+#exit 0
+#fi
 
 if [ "${1}" = "" ]; then
         usageStat
