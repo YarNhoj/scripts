@@ -1,0 +1,97 @@
+#!/bin/ksh
+#makeIso V1.0
+#John R. Ray  12 Oct 2011 JR|RAY
+#General Dynamics Information Technology
+#Make a bootbale ISO and regular ISO and burn them if needed
+
+
+##Functions##
+
+usageStat () {
+	echo
+	echo "makeIso: Makes an ISO image. Can make it bootable and burns it to media\n"
+	echo "usage: makeIso [-b] [-d directory] [-o iso output file] [-n Volume Name] [-f file] [-B]"
+	echo " if -B is added the .iso specified w/ the -o option\n will be burned if it exists and can be burned."
+	echo " if the -b [bootable] option is set [directory] must be the root directory of the boot disc"
+	echo " otherwise [directory] will be used to make the ISO if -f is not specified." 
+	exit 1
+}
+
+getOptions () {
+rootDir=
+outFile=
+volName=
+burnFlag=
+bootAble=
+fileName=
+while getopts d:o:n:f:bB opt; do
+	case $opt in
+		d) rootDir="$OPTARG"
+		;;
+		o) outFile="$OPTARG"
+		;;
+		n) volName="$OPTARG"
+		;;
+		b) bootAble="y"
+		;;
+		f) fileName="$OPTARG"
+		;;
+		B) burnFlag="on"
+		;;
+		*) usageStat
+		;;
+	esac
+done
+shift `expr ${OPTIND} - 1`
+}
+		
+burnIt () {
+	burnCount=
+	if [ "`cdrw -M | grep Media`" = "Media is blank" ]; then
+	cdrw -i ${outFile}
+		if [ "${?}" != "0" ] && [ ${burnCount} -le 2 ]; then
+			echo "ISO Burn Error Insert New Disc and Press Enter to Try Again"
+			burnCount=`expr ${burnCount} + 1`
+			read userInput; burnIt
+		else 
+			echo "Cannot Burn ISO"
+			exit 1
+		fi
+	else
+		echo "Insert Blank Disc and Press Enter" 
+		read userInput; burnIt
+	fi		
+}
+
+makeBoot () {
+cd ${rootDir}
+
+/usr/bin/mkisofs -b boot/grub/stage2_eltorito -c .catalog -no-emul-boot -boot-load-size 4 -boot-info-table -relaxed-filenames -l -ldots -r -N -d -D -V ${volName} -o ${outFile} .
+}
+
+makeIso () {
+ 
+/usr/bin/mkisofs -V ${volName} -o ${outFile} ${1}
+
+}
+
+##Main Script##
+
+if [ "${1}" = "" ]; then
+	usageStat
+fi
+
+#Parse Aurguments#
+getOptions ${*}
+
+if [ "${bootAble}" = "y" ]; then
+	makeBoot
+elif [ "${rootDir}" != "" ]; then
+	makeIso ${rootDir}
+elif [ "${fileName}" != "" ]; then
+	makeIso ${fileName}
+fi
+
+if [ "${burnFlag}" = "on" ]; then
+	burnIt
+fi

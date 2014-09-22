@@ -1,0 +1,32 @@
+#!/bin/ksh
+#sshkeygen V1.0
+#John R. Ray 5 Oct 2011 JR|Ray
+#General Dynamics Information Technology
+#Generates ssh keys and set up directory structures for users.
+
+##Variables##
+USER=`/usr/ucb/whoami`
+HN=`uname -n`
+KN="`echo`${USER}.${HN}"
+KeyDir=${HOME}/.ssh/Keys
+vid=1.0
+
+##Main##
+mkdir -p ${KeyDir} > /dev/null 2>&1
+chmod -R 755 ${HOME}/.ssh
+
+if [ -f ${KeyDir}/id_dsa ] ; then
+  rm ${KeyDir}/id_dsa*
+fi
+
+if [ -f ${KeyDir}/${KN} ] ; then
+  rm ${KeyDir}/${KN}*
+fi
+
+/usr/bin/ssh-keygen -t dsa -f ${KeyDir}/${KN} -N ''
+/usr/bin/ssh-keygen -t dsa -f ${KeyDir}/${KN}.pub -e > ${KeyDir}/${KN}.ssh2
+
+cat ${KeyDir}/${KN} >> ${HOME}/.ssh/id_dsa
+chmod 600 ${HOME}/.ssh/id_dsa
+
+cat ${KeyDir}/*.pub > ${HOME}/.ssh/authorized_keys

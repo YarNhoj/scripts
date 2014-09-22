@@ -1,0 +1,84 @@
+#!/bin/ksh
+#sshadm V1.0
+#John R. Ray 4 March 2011 
+#General Dynamics Information Technology
+#Script to ssh to machines to find out information about them
+
+#V1.1 Added Usage Statement and Option Parsing JR|Ray 6 Oct 2011
+
+#V1.2 Added sudo ability for commands
+
+##Functions##
+usageStat () {
+        echo
+        echo "sshadm: Uses ssh to access remote machines and execute a given command\n"
+        echo "usage: sshadm [-h hostlist] [-H hostname] [-l logfile]"
+        echo " [hostlist] may be a relative path "
+        echo " [logfile] logfile is written to /tmp/[logfile]"
+	echo " [hostname] may be used in place of hostlist to designate a single machine"
+	echo
+        exit 1
+}
+
+getOptions () {
+while getopts h:l:H: opt; do
+        case $opt in
+                h) hostList="$OPTARG"
+                ;;
+                l) logFile="$OPTARG"
+                ;;
+                H) hostName="$OPTARG"
+                ;;
+                *) usageStat
+                ;;
+        esac
+done
+shift `expr ${OPTIND} - 1`
+}
+
+sshAdm () {
+echo ${1} >> /tmp/${logFile}
+ping ${1} > /dev/null
+if [ $? = 0 ]; then
+	echo "Host "${1}" working..."
+	ssh -q ${1} /opt/sfw/bin/sudo ${sshCommand} >> /tmp/${logFile}
+else
+	echo "Machine not responding" >> /tmp/${logFile}
+fi
+}
+
+##Variables##
+hostList=
+hostName=
+logFile=sshadm.$$
+vid=1.1
+
+##Main##
+userId=`id | cut -c5`
+if [ ${userId} = 0 ]; then
+        echo "This script cannot be run as root"
+        echo "Please contact your system administrator."
+exit 0
+fi
+
+if [ "${1}" = "" ]; then
+        usageStat
+fi
+
+#Parse Aurguments#
+getOptions ${*}
+
+echo "Enter command line script"
+read sshCommand
+
+if [ "${hostList}" = "" ] && [ "${hostName}" != "" ]; then
+	sshAdm ${hostName}
+elif [ -f "${hostList}" ]; then
+	for host in `cat ${hostList}`; do
+		sshAdm ${host}
+	done
+else
+	echo "Invalid use of sshadm" > /tmp/${logFile}
+fi
+
+echo "Output file is saved as /tmp/"${logFile}

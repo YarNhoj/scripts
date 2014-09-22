@@ -1,0 +1,49 @@
+#!/usr/bin/bash
+#John R. Ray
+#chgName v1
+#changes a machines hostname in all places
+#check and see if we use crash dir /var/crash and dumpadm
+#also need to know if we want to keep the old names in the hosts file
+#set -x
+
+#v1.1 mades changes to search for loghost and to account for gloabl zones
+
+
+savIt () { 
+cp ${hFile} ${hFile}.`date +%d%m%y`
+cp ${nFile} ${nFile}.`date +%d%m%y`
+for i in ${intList}; do
+cp ${i} ${i}.`date +%d%m%y`
+done
+}
+
+
+updateName () {
+cat ${hFile} | sed "s/"${oName}"/"${nName}"/g;s/loghost/& "${oName}"/g" > /tmp/scratch
+cp /tmp/scratch ${hFile}
+echo ${nName} > /etc/nodename
+for i in ${intList}; do
+echo ${nName} > ${i}
+done
+}
+
+cleanIt () {
+rm /tmp/scratch
+}
+
+##Variables##
+oName=`hostname`
+hFile=/etc/inet/hosts
+nFile=/etc/nodename
+intList=`grep -l ${oName} /etc/hostname.*`
+
+##Main##
+
+echo 'Host Name Changer V1.0'
+echo 'Enter New Hostname'
+read nName
+
+echo 'Saving old data'; savIt
+echo 'Updating Hostname'; updateName
+uname -S ${nName}
+echo 'Cleaning Up'; cleanIt
