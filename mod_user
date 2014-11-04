@@ -1,0 +1,83 @@
+#!/bin/bash
+#John R. Ray <jray@shadow-soft.com>
+#mod_user Modifies a user and all files they own
+
+#DEBUG
+#set -x
+
+##Functions##
+usageStat () {
+ echo
+ echo "mod_user: Modifies user information and all files they own"
+ echo "usage: mod_user -n [userName] -g [gid] -u [uid]"
+ echo " name is the name of the user you want to modify this can be the current UID of the user"
+ echo " gid and uid are the NEW numerical id's you want assigned"
+ echo 
+ exit 1
+}
+
+getOptions () {
+ while getopts n:g:u: opt; do
+  case $opt in
+   n) my_name="$OPTARG"
+   ;;
+   u) new_uid="$OPTARG"
+   ;;
+   g) new_gid="$OPTARG"
+   ;;
+   *) usageStat
+   ;;
+  esac
+ done
+shift `expr ${OPTIND} - 1`
+}
+
+changeIt () {
+	find / -user ${my_name} -print0 | xargs -0 chown ${new_uid}
+	find / -group ${my_group} -print0 | xargs -0 chgrp ${new_gid}
+	groupmod -g ${new_gid} ${my_group}
+	usermod -g ${new_gid} -u ${new_uid} ${my_name}
+}
+
+##Main##
+
+#Parse Aurguments#
+getOptions ${*}
+my_group=`getent group ${my_name} | awk -F: '{print $1}'`
+my_gid=`getent group ${my_name} | awk -F: '{print $3}'`
+my_pgid=`getent passwd ${my_name} | awk -F: '{print $4}'`
+userId=`id | cut -c5`
+
+#Sanity Check
+if [ ${userId} != 0 ]; then
+ echo "This script must be run as root."
+ echo "Please contact your system administrator."
+exit 0
+fi
+
+getent passwd ${new_uid} && echo "UID already in use" && exit 4
+getent group ${new_gid} && echo "GID already in use" && exit 4
+
+#Check and make sure the user's primary group is also their private group
+if [ $my_gid != $my_pgid ] ; then
+ echo "There is a mismatch between the user's primary group and their private group."
+ echo "Their primary group is likely a shared group and should be fixed."
+ exit 5
+fi
+
+echo "Modifying ${my_name} with a new UID of ${new_uid} and a new GID of ${new_gid}"
+echo "Continue? [y/n]"
+read lastchance
+case ${lastchance} in
+ y)
+  echo "Changing user information"; changeIt
+	;;
+ n)
+  echo "Aborting all changes"
+  exit
+  ;;
+*)
+  echo "...aborting"
+  exit
+  ;;
+esac

@@ -1,32 +1,40 @@
-#!/bin/ksh
+#!/bin/bash
 #sshadm V1.0
 #John R. Ray 4 March 2011 
 #Script to ssh to machines to find out information about them
 
 #V1.1 Added Usage Statement and Option Parsing JR|Ray 6 Oct 2011
 
-#V1.2 Added sudo ability for commands
+#DEBUG#
+#set -x
 
 ##Functions##
 usageStat () {
         echo
-        echo "sshadm: Uses ssh to access remote machines and execute a given command\n"
-        echo "usage: sshadm [-h hostlist] [-H hostname] [-l logfile]"
+        echo "sshadm: Uses ssh to access remote machines and execute a given command"
+        echo "usage: sshadm -f -u [username] -d [domainname] [-h hostlist] [-H hostname] [-l logfile]"
         echo " [hostlist] may be a relative path "
         echo " [logfile] logfile is written to /tmp/[logfile]"
-	echo " [hostname] may be used in place of hostlist to designate a single machine"
+       	echo " [hostname] may be used in place of hostlist to designate a single machine"
+       	echo " [domainname] ie example.com"
 	echo
         exit 1
 }
 
 getOptions () {
-while getopts h:l:H: opt; do
+while getopts h:l:H:d:fu: opt; do
         case $opt in
                 h) hostList="$OPTARG"
                 ;;
                 l) logFile="$OPTARG"
                 ;;
                 H) hostName="$OPTARG"
+                ;;
+                d) domainName=".$OPTARG"
+                ;;
+                f) sshOptions="f"
+                ;;
+                u) uName="$OPTARG"
                 ;;
                 *) usageStat
                 ;;
@@ -35,25 +43,33 @@ done
 shift `expr ${OPTIND} - 1`
 }
 
+pHost () {
+	echo "Trying internal address" >> /tmp/${logFile}
+  ping -c 1 ${ADDR/\./-int\.} > /dev/null
+  if [ $? = 0 ]; then
+	 ADDR="${ADDR/\./-int\.}"
+	 echo "Host "${ADDR}" working..." >> /tmp/${logFile}; sshAdm
+  else 
+  	ping -c 1 ${ADDR} > /dev/null
+    if [ $? = 0 ]; then
+	   echo "Host "${ADDR}" working..." >> /tmp/${logFile}; sshAdm
+    fi 
+  fi
+}
+
 sshAdm () {
-echo ${1} >> /tmp/${logFile}
-ping ${1} > /dev/null
-if [ $? = 0 ]; then
-	echo "Host "${1}" working..."
-	ssh -qf ${1} ${sudocmd} ${sshCommand} >> /tmp/${logFile}
-else
-	echo "Machine not responding" >> /tmp/${logFile}
-fi
+	ssh -q${sshOptions} ${uName}@${ADDR} ${sshCommand} >> /tmp/${logFile}
 }
 
 ##Variables##
 hostList=
 hostName=
+domainName=
 logFile=sshadm.$$
 vid=1.1
-sudocmd=`which sudo`
 
 ##Main##
+#Sanity Check#
 userId=`id | cut -c5`
 #if [ ${userId} = 0 ]; then
 #        echo "This script cannot be run as root"
@@ -62,7 +78,7 @@ userId=`id | cut -c5`
 #fi
 
 if [ "${1}" = "" ]; then
-        usageStat
+  usageStat
 fi
 
 #Parse Aurguments#
@@ -72,10 +88,10 @@ echo "Enter command line script"
 read sshCommand
 
 if [ "${hostList}" = "" ] && [ "${hostName}" != "" ]; then
-	sshAdm ${hostName}
+	ADDR=${hostName}${domainName}; pHost
 elif [ -f "${hostList}" ]; then
-	for host in `cat ${hostList}`; do
-		sshAdm ${host}
+	for hostname in `cat ${hostList}`; do
+	  ADDR=${hostname}${domainName}; pHost
 	done
 else
 	echo "Invalid use of sshadm" > /tmp/${logFile}
