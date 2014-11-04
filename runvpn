@@ -1,52 +1,42 @@
-#!/bin/bash
-#set -x
-#########################
-# Added functionality to automatically start/restart
-# the VPNs without having to manually interfer.
-# 
-# ==============
-# PREREQUISITES:
-# ==============
-# - Python
-# - The authtoken script
-# - This requires you to "sudo pip install onetimepass" to make authtoken work
-# - Your OAUTH secret for the authtoken script
-# - The variables below edited to match your personal use case.
-# - The case statement below edited for your personal preference for vpn names
-# - Finally, you need your vpn configs to be edited to have
-#     auth-user-pass login.conf   
-#   Normally they only have auth-user-pass.  Adding the login.conf part makes this work.
+#!/usr/bin/env ruby
+# Connect to VPN
 #
-#########################
-BASEFILE=~/.ssh/baseline
-CONFFILE=~/.ssh/login.conf
-SYMLINK=/etc/openvpn/login.conf
 
-sudo uptime
-sudo service openvpn status
+require 'rubygems'
+require 'rotp'
+require 'pty'
+require 'expect'
+require 'optparse'
+require 'pry'
 
-case "$1" in
-or)
-  VPN="or"
-  ;;
-va)
-  VPN="va"
-  ;;
-*)
-  VPN="or va"
-  ;;
-esac
+config = {
+	:my_secret => 'SECRET',
+	:my_key => 'KEY',
+	:my_username => 'USERNAME',
+}
 
-echo $VPN
-for file in $VPN
-do
-AUTHTOKEN=`~/scripts/get_token`
-  sed "a\
-Welcom365${AUTHTOKEN}" $BASEFILE > $CONFFILE 
-  sudo ln -sf $CONFFILE $SYMLINK
-  sudo service openvpn restart $file
-  rm $CONFFILE
-  sudo rm $SYMLINK
-done
-sleep 5
-service openvpn status
+opts = {}
+optparse = OptionParser.new do |opt|
+	opt.banner = "Usage: runvpn zoneName"
+	opt.on '-z ZONES', '--zone ZONES', Array, "Name of the zone you wish to connect to" do |z|
+		opts[:zones] = z
+	end
+end
+optparse.parse!
+
+# Get One Time Password
+totp = ROTP::TOTP.new config[:my_secret]
+pass = config[:my_key] + totp.now
+
+# Connect to VPN
+opts[:zones].each do |zone|
+  PTY.spawn "sudo service openvpn restart #{zone}" do |r_f,w_f|
+	  r_f.expect "Enter Auth Username:" do
+    	w_f.puts "#{config[:my_username]}\n"
+	  end
+  	r_f.expect "Enter Auth Password:" do
+      w_f.puts "#{pass}\n"
+  	end
+  end
+	sleep 30
+end
